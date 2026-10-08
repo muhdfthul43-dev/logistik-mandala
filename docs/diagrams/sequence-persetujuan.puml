@@ -1,0 +1,41 @@
+@startuml sequence-persetujuan
+title Sequence — Tindakan Setuju/Tolak pada Satu Tahap
+
+actor "Staf Logistik / Pimpinan" as Aktor
+participant "Halaman Detail\nPengajuan" as UI
+participant "Server Action\ntindakanPengajuan()" as Action
+participant "Supabase\n(Postgres + RLS)" as DB
+
+Aktor -> UI : Klik "Setujui" / "Tolak"
+UI -> Action : tindakanPengajuan(id, aksi, catatan)
+Action -> Action : requireUser()\n(pastikan sudah login)
+Action -> DB : SELECT pengajuan + items WHERE id = ...
+DB --> Action : data pengajuan
+
+Action -> Action : cek TAHAP_PENANGGUNG_JAWAB\n[tahap_saat_ini] includes role?
+
+alt role tidak berwenang
+  Action --> UI : { error: "Tidak berwenang..." }
+  UI --> Aktor : Tampilkan pesan error
+else role berwenang & aksi = "tolak"
+  Action -> DB : UPDATE pengajuan\nSET status='ditolak', alasan_penolakan=...
+  Action -> DB : INSERT riwayat_pengajuan (aksi='ditolak')
+  DB --> Action : OK
+  Action --> UI : { error: null }
+  UI --> Aktor : Toast "Pengajuan ditolak"
+else role berwenang & aksi = "setuju" & bukan tahap akhir
+  Action -> DB : UPDATE pengajuan\nSET tahap_saat_ini = tahap berikutnya
+  Action -> DB : INSERT riwayat_pengajuan (aksi=...)
+  DB --> Action : OK
+  Action --> UI : { error: null }
+  UI --> Aktor : Toast "Disetujui pada tahap ini"
+else role berwenang & aksi = "setuju" & tahap akhir (MAT-004)
+  Action -> DB : UPDATE pengajuan SET status='disetujui'
+  Action -> DB : INSERT inventaris_masuk\n(untuk tiap item pengajuan)
+  Action -> DB : INSERT riwayat_pengajuan (aksi='disetujui')
+  DB --> Action : OK
+  Action --> UI : { error: null }
+  UI --> Aktor : Toast "Disetujui — masuk Inventaris"
+end
+
+@enduml

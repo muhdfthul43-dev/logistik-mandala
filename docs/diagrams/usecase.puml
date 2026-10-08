@@ -1,0 +1,58 @@
+@startuml usecase-logistik
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+
+actor "Pemohon" as Pemohon
+actor "Staf Logistik" as Staf
+actor "Pimpinan" as Pimpinan
+actor "Admin" as Admin
+
+Staf --|> Pemohon
+Pimpinan --|> Pemohon
+Admin --|> Staf
+Admin --|> Pimpinan
+
+rectangle "Sistem Logistik STT Mandala" {
+  usecase "Masuk / Daftar Akun" as UC0
+  usecase "Buat Pengajuan Barang\n(MAT-001)" as UC1
+  usecase "Melihat Status Pengajuan" as UC2
+  usecase "Membatalkan Pengajuan" as UC3
+  usecase "Verifikasi Pengajuan\n(MAT-002)" as UC4
+  usecase "Proses & Cek Ketersediaan\n(MAT-003)" as UC5
+  usecase "Persetujuan Akhir\n(MAT-004)" as UC6
+  usecase "Tolak Pengajuan\n(disertai alasan)" as UC7
+  usecase "Lihat Laporan per Kategori" as UC8
+  usecase "Lihat Laporan per Unit Kerja" as UC9
+  usecase "Unduh Laporan PDF" as UC10
+  usecase "Lihat Inventaris Masuk" as UC11
+  usecase "Kelola Data Master\n(Kategori/Unit Kerja/Barang)" as UC12
+  usecase "Kelola Peran Pengguna" as UC13
+}
+
+Pemohon --> UC0
+Pemohon --> UC1
+Pemohon --> UC2
+Pemohon --> UC3
+Pemohon --> UC8
+Pemohon --> UC9
+Pemohon --> UC10
+Pemohon --> UC11
+
+Staf --> UC4
+Staf --> UC5
+Staf --> UC7
+Staf --> UC12
+
+Pimpinan --> UC6
+Pimpinan --> UC7
+
+Admin --> UC13
+
+UC4 ..> UC7 : <<extend>>
+UC5 ..> UC7 : <<extend>>
+UC6 ..> UC7 : <<extend>>
+UC10 ..> UC8 : <<extend>>
+UC10 ..> UC9 : <<extend>>
+
+@enduml

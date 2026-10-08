@@ -1,0 +1,51 @@
+@startuml activity-pengajuan
+title Alur Pengajuan Barang — MAT-001 s.d MAT-004
+
+|Pemohon|
+start
+:Isi formulir pengajuan\n(perihal, daftar barang, catatan);
+:Kirim pengajuan (MAT-001);
+note right: Nomor pengajuan dibuat otomatis\n(PGJ-TAHUN-NNNN)
+
+|Staf Logistik|
+:Terima di antrean verifikasi (MAT-002);
+if (Pengajuan valid & wajar?) then (setuju)
+  :Verifikasi disetujui;
+else (tolak)
+  :Isi alasan penolakan;
+  |Pemohon|
+  :Terima notifikasi ditolak;
+  stop
+endif
+
+|Staf Logistik|
+:Cek ketersediaan stok &\nsiapkan pengadaan (MAT-003);
+if (Stok/pengadaan siap?) then (setuju)
+  :Proses disetujui, teruskan ke Pimpinan;
+else (tolak)
+  :Isi alasan penolakan;
+  |Pemohon|
+  :Terima notifikasi ditolak;
+  stop
+endif
+
+|Pimpinan|
+:Tinjau pengajuan (MAT-004);
+if (Setuju secara final?) then (setuju)
+  :Persetujuan akhir diberikan;
+else (tolak)
+  :Isi alasan penolakan;
+  |Pemohon|
+  :Terima notifikasi ditolak;
+  stop
+endif
+
+|Sistem|
+:Catat barang ke\nInventaris Masuk otomatis;
+:Ubah status pengajuan\nmenjadi "Disetujui";
+
+|Pemohon|
+:Terima notifikasi disetujui;
+stop
+
+@enduml
