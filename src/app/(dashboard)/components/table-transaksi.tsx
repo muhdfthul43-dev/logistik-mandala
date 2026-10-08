@@ -253,6 +253,7 @@ export function TableTransaksi({ data, mode }: { data: any[], mode: 'berjalan' |
               <th className="px-4 py-3 font-medium">No. Dokumen</th>
               <th className="px-4 py-3 font-medium">MAT</th>
               <th className="px-4 py-3 font-medium">Perihal</th>
+              <th className="px-4 py-3 font-medium">Barang / Material</th>
               <th className="px-4 py-3 font-medium">Jml Item</th>
               <th className="px-4 py-3 font-medium">Status Item</th>
               <th className="px-4 py-3 font-medium">Brg Diajukan</th>
@@ -263,7 +264,7 @@ export function TableTransaksi({ data, mode }: { data: any[], mode: 'berjalan' |
           <tbody className="divide-y divide-surface-border">
             {filteredData.length === 0 ? (
               <tr>
-                <td colSpan={mode === 'berjalan' ? 9 : 8} className="px-4 py-8 text-center text-ink-muted">
+                <td colSpan={mode === 'berjalan' ? 10 : 9} className="px-4 py-8 text-center text-ink-muted">
                   {data.length === 0 ? "Belum ada data transaksi." : "Tidak ada transaksi yang cocok dengan filter."}
                 </td>
               </tr>
@@ -336,6 +337,14 @@ export function TableTransaksi({ data, mode }: { data: any[], mode: 'berjalan' |
                       <span className="rounded-md bg-surface-muted px-2 py-1 text-xs font-medium">{row.mat_kode}</span>
                     </td>
                     <td className="px-4 py-3 max-w-[200px] truncate" title={row.perihal}>{row.perihal}</td>
+                    <td className="px-4 py-3 max-w-[250px] truncate" title={row.items?.map((i: any) => i.nama_barang).join(', ')}>
+                      {(() => {
+                        const names = row.items?.map((i: any) => i.nama_barang).filter(Boolean) || [];
+                        if (names.length === 0) return "-";
+                        if (names.length <= 2) return names.join(", ");
+                        return `${names[0]}, ${names[1]} (+${names.length - 2} lainnya)`;
+                      })()}
+                    </td>
                     <td className="px-4 py-3">{row.items?.length || 0} item</td>
                     <td className="px-4 py-3">{statusItemBadge}</td>
                     <td className="px-4 py-3">{tDiajukan} unit</td>
