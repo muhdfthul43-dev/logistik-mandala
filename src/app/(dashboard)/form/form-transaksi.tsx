@@ -2,30 +2,48 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus, Trash2, Save } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Trash2, Plus, Save, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { saveTransaksi } from "./actions";
 import { MAT_KODE_LABEL, JENIS_BARANG_LABEL, SATUAN_UMUM } from "@/lib/types";
 
-export function FormTransaksi({ initialData, masterBarang }: { initialData?: any, masterBarang: any[] }) {
+export function FormTransaksi({ initialData, masterBarang, masterPekerjaan }: { initialData?: any, masterBarang: any[], masterPekerjaan: any[] }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   const [header, setHeader] = useState({
     id: initialData?.id || "",
+    nomor_pengajuan: initialData?.nomor_pengajuan || "",
     mat_kode: initialData?.mat_kode || "MAT-001",
     perihal: initialData?.perihal || "",
     catatan: initialData?.catatan || "",
+  });
+
+  const createEmptyItem = () => ({
+    id: "",
+    master_barang_id: null,
+    kode_barang_manual: null,
+    input_kode: "",
+    nama_barang: "",
+    satuan: "Pcs",
+    jenis_barang: "habis_pakai",
+    merk: "",
+    ukuran_volume: "",
+    jumlah_diajukan: "",
+    jumlah_terpenuhi: "0",
+    keterangan: "",
+    tanggal_pengajuan: new Date().toISOString().split("T")[0],
+    tanggal_penerimaan: "",
+    jenis_pekerjaan: "",
   });
 
   const [items, setItems] = useState<any[]>(
     initialData?.items?.length > 0
       ? initialData.items.map((i: any) => ({
           ...i,
-          // for display in input, we extract the kode_barang from master_barang if it exists
           input_kode: i.master_barang_id 
             ? masterBarang.find(m => m.id === i.master_barang_id)?.kode_barang 
             : i.kode_barang_manual || "",
@@ -33,31 +51,11 @@ export function FormTransaksi({ initialData, masterBarang }: { initialData?: any
       : [createEmptyItem()]
   );
 
-  function createEmptyItem() {
-    return {
-      input_kode: "",
-      master_barang_id: null,
-      kode_barang_manual: null,
-      jenis_pekerjaan: "",
-      nama_barang: "",
-      merk: "",
-      ukuran_volume: "",
-      satuan: "Pcs",
-      jenis_barang: "habis_pakai",
-      jumlah_diajukan: 0,
-      jumlah_terpenuhi: 0,
-      tanggal_pengajuan: "",
-      tanggal_penerimaan: "",
-      keterangan: "",
-    };
-  }
-
   const handleKodeChange = (index: number, value: string) => {
     const newItems = [...items];
     const item = newItems[index];
     item.input_kode = value;
     
-    // Autofill logic
     const matched = masterBarang.find(m => m.kode_barang.toLowerCase() === value.toLowerCase());
     if (matched) {
       item.master_barang_id = matched.id;
@@ -69,7 +67,28 @@ export function FormTransaksi({ initialData, masterBarang }: { initialData?: any
       item.master_barang_id = null;
       item.kode_barang_manual = value || null;
     }
+    setItems(newItems);
+  };
+
+  const handleNamaChange = (index: number, value: string) => {
+    const newItems = [...items];
+    const item = newItems[index];
+    item.nama_barang = value;
     
+    // Check if the exact name matches a master item
+    const matched = masterBarang.find(m => m.nama_barang.toLowerCase() === value.toLowerCase());
+    if (matched) {
+      item.master_barang_id = matched.id;
+      item.input_kode = matched.kode_barang;
+      item.kode_barang_manual = null;
+      item.satuan = matched.satuan_default;
+      item.jenis_barang = matched.jenis_barang_default;
+    } else {
+      item.master_barang_id = null;
+      if (!item.kode_barang_manual) {
+        item.kode_barang_manual = item.input_kode || null;
+      }
+    }
     setItems(newItems);
   };
 
@@ -79,56 +98,74 @@ export function FormTransaksi({ initialData, masterBarang }: { initialData?: any
     setItems(newItems);
   };
 
+  const addItem = () => setItems([...items, createEmptyItem()]);
   const removeItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
+    if (items.length > 1) {
+      setItems(items.filter((_, i) => i !== index));
+    }
   };
 
-  const addItem = () => {
-    setItems([...items, createEmptyItem()]);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     startTransition(async () => {
       try {
-        await saveTransaksi({ ...header, items });
+        const payloadItems = items.map(i => {
+          const res = { ...i };
+          delete res.input_kode; // virtual field
+          if (!res.master_barang_id && res.kode_barang_manual === "") {
+            res.kode_barang_manual = null;
+          }
+          return res;
+        });
+
+        await saveTransaksi({ ...header, items: payloadItems });
         router.push(header.mat_kode === 'MAT-004' ? '/selesai' : '/berjalan');
-      } catch (err) {
-        console.error(err);
-        alert("Gagal menyimpan transaksi.");
+      } catch (error: any) {
+        alert("Gagal menyimpan: " + error.message);
       }
     });
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8 pb-20">
-      <div className="rounded-2xl border border-surface-border/60 bg-surface p-6 shadow-sm">
-        <h2 className="mb-4 text-lg font-semibold">Header Pengajuan</h2>
+    <form onSubmit={onSubmit} className="space-y-8">
+      {/* DATALISTS FOR AUTOCOMPLETE */}
+      <datalist id="master-kode-list">
+        {masterBarang.map(m => <option key={`kode-${m.id}`} value={m.kode_barang}>{m.nama_barang}</option>)}
+      </datalist>
+      <datalist id="master-nama-list">
+        {masterBarang.map(m => <option key={`nama-${m.id}`} value={m.nama_barang}>{m.kode_barang} - {m.jenis_barang_default}</option>)}
+      </datalist>
+      <datalist id="satuan-options-form">
+        {SATUAN_UMUM.map(s => <option key={s} value={s} />)}
+      </datalist>
+
+      <div className="rounded-2xl border border-surface-border/60 bg-surface p-6 shadow-sm transition-all md:p-8">
+        <h2 className="mb-6 text-xl font-bold">Header Dokumen</h2>
         <div className="grid gap-6 md:grid-cols-2">
-          {initialData && (
-            <div className="space-y-1.5 md:col-span-2">
-              <Label>No. Dokumen</Label>
-              <Input value={initialData.nomor_pengajuan} disabled className="bg-surface-muted" />
-            </div>
-          )}
           
-          <div className="space-y-1.5 md:col-span-1">
-            <Label>Fase (MAT)</Label>
-            <Select 
-              value={header.mat_kode} 
-              onValueChange={(v) => setHeader({ ...header, mat_kode: v })}
-            >
+          <div className="space-y-1.5">
+            <Label>Nomor Dokumen <span className="text-bad">*</span></Label>
+            <Input 
+              value={header.nomor_pengajuan} 
+              onChange={(e) => setHeader({ ...header, nomor_pengajuan: e.target.value })} 
+              placeholder="Contoh: PKB/2026/10/003 (Dibuat otomatis jika kosong)" 
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Fase Dokumen (MAT)</Label>
+            <Select value={header.mat_kode} onValueChange={(v) => setHeader({ ...header, mat_kode: v })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {Object.entries(MAT_KODE_LABEL).map(([k, v]) => (
-                  <SelectItem key={k} value={k}>{v}</SelectItem>
+                  <SelectItem key={k} value={k}>{k} - {v}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          <div className="space-y-1.5 md:col-span-1">
-            <Label>Perihal</Label>
+          <div className="space-y-1.5 md:col-span-2">
+            <Label>Perihal Dokumen <span className="text-bad">*</span></Label>
             <Input 
               value={header.perihal} 
               onChange={(e) => setHeader({ ...header, perihal: e.target.value })} 
@@ -170,7 +207,7 @@ export function FormTransaksi({ initialData, masterBarang }: { initialData?: any
           }
 
           return (
-            <div key={idx} className="relative rounded-2xl border border-surface-border/60 bg-surface p-5 shadow-sm transition-all duration-300 hover:shadow-md">
+            <div key={idx} className={`relative rounded-2xl border ${item.master_barang_id ? 'border-good/40 bg-good/5' : 'border-surface-border/60 bg-surface'} p-5 shadow-sm transition-all duration-300 hover:shadow-md`}>
               <button 
                 type="button" 
                 onClick={() => removeItem(idx)}
@@ -189,37 +226,46 @@ export function FormTransaksi({ initialData, masterBarang }: { initialData?: any
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-12">
-                {/* Baris 1: Identifikasi Utama */}
+                
+                {/* AUTOCOMPLETE KODE & NAMA */}
                 <div className="space-y-1.5 md:col-span-2">
                   <Label>Kode Barang</Label>
                   <Input 
+                    list="master-kode-list"
                     value={item.input_kode} 
                     onChange={(e) => handleKodeChange(idx, e.target.value)}
-                    placeholder="BRG-..." 
+                    placeholder="Pilih/Ketik..." 
+                    className={item.master_barang_id ? "border-good/50 focus-visible:ring-good" : ""}
                   />
                   {item.master_barang_id ? (
-                    <p className="text-[10px] font-medium text-good">✓ Ditemukan</p>
+                    <p className="flex items-center gap-1 text-[10px] font-medium text-good"><CheckCircle2 className="h-3 w-3"/> Terhubung</p>
                   ) : item.input_kode ? (
-                    <p className="text-[10px] font-medium text-warn">⚠️ Entri Manual</p>
+                    <p className="flex items-center gap-1 text-[10px] font-medium text-warn"><AlertCircle className="h-3 w-3"/> Manual</p>
                   ) : null}
                 </div>
 
                 <div className="space-y-1.5 md:col-span-4">
-                  <Label>Nama Barang</Label>
+                  <Label>Nama Barang <span className="text-bad">*</span></Label>
                   <Input 
+                    list="master-nama-list"
                     value={item.nama_barang} 
-                    onChange={(e) => updateItem(idx, 'nama_barang', e.target.value)}
+                    onChange={(e) => handleNamaChange(idx, e.target.value)}
                     required 
+                    placeholder="Cari dari Kamus Data..."
+                    className={item.master_barang_id ? "border-good/50 focus-visible:ring-good font-semibold" : ""}
                   />
                 </div>
 
                 <div className="space-y-1.5 md:col-span-3">
                   <Label>Jenis Pekerjaan</Label>
-                  <Input 
-                    value={item.jenis_pekerjaan || ''} 
-                    onChange={(e) => updateItem(idx, 'jenis_pekerjaan', e.target.value)}
-                    placeholder="Contoh: ATK/IT" 
-                  />
+                  <Select value={item.jenis_pekerjaan || ""} onValueChange={(v) => updateItem(idx, 'jenis_pekerjaan', v)}>
+                    <SelectTrigger><SelectValue placeholder="Pilih..." /></SelectTrigger>
+                    <SelectContent>
+                      {masterPekerjaan.map(mp => (
+                        <SelectItem key={mp.id} value={mp.nama_pekerjaan}>{mp.nama_pekerjaan}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-1.5 md:col-span-3">
@@ -230,7 +276,6 @@ export function FormTransaksi({ initialData, masterBarang }: { initialData?: any
                   />
                 </div>
 
-                {/* Baris 2: Detail Fisik & Kuantitas */}
                 <div className="space-y-1.5 md:col-span-2">
                   <Label>Ukuran / Vol</Label>
                   <Input 
@@ -241,18 +286,21 @@ export function FormTransaksi({ initialData, masterBarang }: { initialData?: any
 
                 <div className="space-y-1.5 md:col-span-2">
                   <Label>Satuan</Label>
-                  <Select value={item.satuan} onValueChange={(v) => updateItem(idx, 'satuan', v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {SATUAN_UMUM.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <Input 
+                    list="satuan-options-form"
+                    required 
+                    value={item.satuan} 
+                    onChange={(e) => updateItem(idx, 'satuan', e.target.value)} 
+                    placeholder="Ketik / Pilih..." 
+                    disabled={!!item.master_barang_id}
+                    className={item.master_barang_id ? "bg-surface-muted opacity-70" : ""}
+                  />
                 </div>
                 
                 <div className="space-y-1.5 md:col-span-3">
                   <Label>Kategori Barang</Label>
-                  <Select value={item.jenis_barang} onValueChange={(v) => updateItem(idx, 'jenis_barang', v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Select value={item.jenis_barang} onValueChange={(v) => updateItem(idx, 'jenis_barang', v)} disabled={!!item.master_barang_id}>
+                    <SelectTrigger className={item.master_barang_id ? "bg-surface-muted opacity-70" : ""}><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {Object.entries(JENIS_BARANG_LABEL).map(([k, v]) => (
                         <SelectItem key={k} value={k}>{v}</SelectItem>
@@ -280,7 +328,6 @@ export function FormTransaksi({ initialData, masterBarang }: { initialData?: any
                   />
                 </div>
 
-                {/* Baris 3: Tanggal & Keterangan */}
                 <div className="space-y-1.5 md:col-span-3">
                   <Label>Tgl Pengajuan</Label>
                   <Input 

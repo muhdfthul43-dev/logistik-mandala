@@ -37,3 +37,24 @@ export async function toggleMasterBarang(id: string, aktif: boolean) {
   revalidatePath("/master");
   return { success: true };
 }
+
+export async function saveMasterPekerjaan(formData: FormData) {
+  const nama = formData.get("nama_pekerjaan")?.toString();
+  if (!nama) throw new Error("Nama Pekerjaan wajib diisi");
+  
+  const supabase = await createClient();
+  const { error } = await supabase.from("master_pekerjaan").insert({ nama_pekerjaan: nama });
+  
+  if (error) throw new Error(error.message);
+  revalidatePath("/master");
+  return { success: true };
+}
+
+export async function deleteMasterPekerjaan(id: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.from("master_pekerjaan").delete().eq("id", id);
+  
+  if (error) throw new Error(error.message);
+  revalidatePath("/master");
+  return { success: true };
+}

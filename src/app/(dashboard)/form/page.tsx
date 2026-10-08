@@ -11,11 +11,7 @@ export default async function FormPage({
   const supabase = await createClient();
 
   // Load master barang untuk autofill
-  const { data: masterBarang } = await supabase
-    .from("master_barang")
-    .select("*")
-    .eq("aktif", true)
-    .order("kode_barang", { ascending: true });
+  const [resBarang, resPekerjaan] = await Promise.all([supabase.from("master_barang").select("*").eq("aktif", true).order("kode_barang", { ascending: true }), supabase.from("master_pekerjaan").select("*").order("nama_pekerjaan", { ascending: true })]); const masterBarang = resBarang.data;
 
   let initialData = null;
 
@@ -69,8 +65,9 @@ export default async function FormPage({
 
       <FormTransaksi 
         initialData={initialData} 
-        masterBarang={masterBarang || []} 
+        masterBarang={masterBarang || []} masterPekerjaan={resPekerjaan.data || []} 
       />
     </div>
   );
 }
+

@@ -55,6 +55,46 @@ export async function saveTransaksi(formData: any) {
     await supabase.from("pengajuan_item").delete().eq("pengajuan_id", pengajuanId);
   }
 
+  // Auto-register manual items to Master Barang
+  if (items && items.length > 0) {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      // Jika belum terhubung ke Master Data
+      if (!item.master_barang_id) {
+         let newKode = item.kode_barang_manual;
+         
+         if (newKode) {
+            // Check if this manual code already exists in master (happens if user edits an existing linked item's name)
+            const { data: existing } = await supabase.from("master_barang").select("id").eq("kode_barang", newKode).maybeSingle();
+            if (existing) {
+               newKode = `AUTO-${Math.floor(Math.random() * 90000) + 10000}`;
+            }
+         } else {
+            newKode = `AUTO-${Math.floor(Math.random() * 90000) + 10000}`;
+         }
+         
+         // Coba masukkan ke master_barang
+         const { data: newMaster, error: masterErr } = await supabase
+           .from("master_barang")
+           .insert({
+              kode_barang: newKode,
+              nama_barang: item.nama_barang,
+              satuan_default: item.satuan || 'Pcs',
+              jenis_barang_default: item.jenis_barang || 'habis_pakai',
+              status: 'aktif'
+           })
+           .select()
+           .single();
+           
+         if (!masterErr && newMaster) {
+            // Sukses didaftarkan ke Master, ubah item ini jadi terhubung!
+            item.master_barang_id = newMaster.id;
+            item.kode_barang_manual = null;
+         }
+      }
+    }
+  }
+
   // Insert items
   if (items && items.length > 0) {
     const itemsToInsert = items.map((item: any) => ({
@@ -81,6 +121,7 @@ export async function saveTransaksi(formData: any) {
   revalidatePath("/berjalan");
   revalidatePath("/selesai");
   revalidatePath("/dashboard");
+  revalidatePath("/master");
   
   return { success: true, id: pengajuanId };
 }
