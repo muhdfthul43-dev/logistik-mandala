@@ -1,4 +1,4 @@
-import { ClipboardList, PackageOpen, Activity, CheckCircle2, AlertTriangle, ArrowRight, Clock } from "lucide-react";
+import { ClipboardList, PackageOpen, Activity, CheckCircle2, AlertTriangle, ArrowRight, Clock, Target } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserOrRedirect } from "@/lib/permissions";
@@ -143,22 +143,62 @@ export default async function DashboardPage() {
         </div>
       </div>
 
+      {/* Project Fulfillment Progress Bars */}
+      <Card className="p-6 flex flex-col h-[350px]">
+        <div className="mb-6 flex items-center justify-between shrink-0">
+          <div>
+            <h3 className="font-display text-lg font-semibold text-ink">Persentase Proyek</h3>
+            <p className="text-sm text-ink-muted">Indikator logistik per Pekerjaan.</p>
+          </div>
+          <Target className="h-5 w-5 text-ink-muted" />
+        </div>
+        <div className="space-y-5 overflow-y-auto pr-2 custom-scrollbar flex-1">
+          {chartData.length === 0 ? (
+            <p className="text-sm text-ink-muted text-center py-4">Belum ada data proyek.</p>
+          ) : (
+            chartData
+              .sort((a, b) => b.diajukan - a.diajukan) // Sort by largest project first
+              .map(p => {
+              const percentage = p.diajukan === 0 ? 0 : Math.round((p.terpenuhi / p.diajukan) * 100);
+              let barColor = "bg-bad";
+              if (percentage >= 100) barColor = "bg-good";
+              else if (percentage >= 50) barColor = "bg-warn";
+              
+              return (
+                <div key={p.name} className="flex flex-col gap-2">
+                  <div className="flex justify-between text-sm font-medium">
+                    <span className="text-ink truncate mr-2" title={p.name === 'Umum' ? 'Pekerjaan Umum' : p.name}>{p.name === 'Umum' ? 'Umum' : p.name}</span>
+                    <span className="text-ink-muted shrink-0">{percentage}%</span>
+                  </div>
+                  <div className="h-2.5 w-full rounded-full bg-surface-muted overflow-hidden border border-surface-border/50">
+                    <div 
+                      className={`h-full ${barColor} transition-all duration-1000 ease-out`} 
+                      style={{ width: `${Math.min(percentage, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </Card>
+
       {/* Recent Activities */}
       <Card className="p-6">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h3 className="font-display text-lg font-semibold text-ink">Aktivitas Logistik Terkini</h3>
-            <p className="text-sm text-ink-muted">5 dokumen terakhir yang dibuat ke dalam sistem.</p>
+            <h3 className="font-display text-lg font-semibold text-ink">Aktivitas Terkini</h3>
+            <p className="text-sm text-ink-muted">5 dokumen terakhir masuk.</p>
           </div>
           <Clock className="h-5 w-5 text-ink-muted" />
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+          <table className="w-full text-left text-sm min-w-[400px]">
             <thead className="border-b border-surface-border text-ink-muted">
               <tr>
-                <th className="py-2 font-medium">No. Dokumen</th>
+                <th className="py-2 font-medium">Dokumen</th>
                 <th className="py-2 font-medium">Tanggal</th>
-                <th className="py-2 font-medium">Fase MAT</th>
+                <th className="py-2 font-medium">Fase</th>
                 <th className="py-2 font-medium">Perihal</th>
               </tr>
             </thead>
@@ -171,13 +211,17 @@ export default async function DashboardPage() {
                 recentActivities.map(p => (
                   <tr key={p.id} className="hover:bg-surface-muted/30">
                     <td className="py-3 font-medium">
-                      <Link href={`/form?id=${p.id}`} className="hover:text-accent transition-colors">{p.nomor_pengajuan}</Link>
+                      <Link href={`/form?id=${p.id}`} className="hover:text-accent transition-colors block text-xs">{p.nomor_pengajuan}</Link>
                     </td>
-                    <td className="py-3 text-ink-muted">{p.created_at ? formatDate(p.created_at) : "-"}</td>
                     <td className="py-3">
-                      <span className="rounded-md bg-surface-muted px-2 py-1 text-xs font-medium">{p.mat_kode}</span>
+                      <span className="text-xs text-ink-muted block mt-0.5">{p.created_at ? formatDate(p.created_at) : "-"}</span>
                     </td>
-                    <td className="py-3 max-w-[200px] truncate" title={p.perihal || ""}>{p.perihal}</td>
+                    <td className="py-3">
+                      <span className="rounded-md bg-surface-muted border border-surface-border/50 px-1.5 py-0.5 text-[11px] font-bold">{p.mat_kode}</span>
+                    </td>
+                    <td className="py-3 text-xs" title={p.perihal || ""}>
+                      <div className="line-clamp-2">{p.perihal}</div>
+                    </td>
                   </tr>
                 ))
               )}

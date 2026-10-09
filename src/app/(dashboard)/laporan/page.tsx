@@ -1,6 +1,10 @@
 import { LaporanClient } from "./laporan-client";
+import { createClient } from "@/lib/supabase/server";
 
-export default function LaporanPage() {
+export default async function LaporanPage() {
+  const supabase = await createClient();
+  const { data: masterPekerjaan } = await supabase.from("master_pekerjaan").select("*").order("nama_pekerjaan");
+
   return (
     <div className="space-y-6 print:space-y-0">
       <div className="print:hidden">
@@ -10,7 +14,7 @@ export default function LaporanPage() {
         </p>
       </div>
 
-      <LaporanClient />
+      <LaporanClient masterPekerjaan={masterPekerjaan || []} />
     </div>
   );
 }

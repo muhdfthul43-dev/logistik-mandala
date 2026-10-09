@@ -16,13 +16,25 @@ export async function saveTransaksi(formData: any) {
     const month = String(new Date().getMonth() + 1).padStart(2, "0");
     const prefix = `PKB/${year}/${month}/`;
     
-    // get count for this month
-    const { count } = await supabase
+    // get latest sequence for this month to avoid unique constraint errors if a document was deleted
+    const { data: latestDoc } = await supabase
       .from("pengajuan")
-      .select("*", { count: "exact", head: true })
-      .like("nomor_pengajuan", `${prefix}%`);
+      .select("nomor_pengajuan")
+      .like("nomor_pengajuan", `${prefix}%`)
+      .order("nomor_pengajuan", { ascending: false })
+      .limit(1)
+      .maybeSingle();
       
-    const seq = String((count || 0) + 1).padStart(3, "0");
+    let seqNumber = 1;
+    if (latestDoc && latestDoc.nomor_pengajuan) {
+      const parts = latestDoc.nomor_pengajuan.split('/');
+      if (parts.length === 4) {
+        const numStr = parts[3].split('-')[0]; // gets '004' from '004-A'
+        seqNumber = parseInt(numStr, 10) + 1;
+      }
+    }
+    
+    const seq = String(seqNumber).padStart(3, "0");
     const nomor_pengajuan = `${prefix}${seq}`;
 
     const { data: header, error: headerErr } = await supabase

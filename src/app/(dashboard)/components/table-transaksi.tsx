@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { PenerimaanModal } from "@/components/ui/penerimaan-modal";
+import { ItemDetailModal } from "@/components/ui/item-detail-modal";
 import { JENIS_BARANG_LABEL } from "@/lib/types";
 
 const MONTH_NAMES = [
@@ -37,6 +39,44 @@ export function TableTransaksi({ data, mode }: { data: any[], mode: 'berjalan' |
   const [confirmConfig, setConfirmConfig] = useState<{ isOpen: boolean; title: string; message: string; isDestructive: boolean; action: () => void }>({
     isOpen: false, title: "", message: "", isDestructive: false, action: () => {}
   });
+
+  // Penerimaan Modal State
+  const [penerimaanConfig, setPenerimaanConfig] = useState<{
+    isOpen: boolean;
+    items: any[];
+    actionType: 'batch_doc' | 'split_items';
+    targetMat: string;
+  }>({ isOpen: false, items: [], actionType: 'batch_doc', targetMat: 'MAT-004' });
+
+  // Item Detail Modal State
+  const [itemDetail, setItemDetail] = useState<{ isOpen: boolean; item: any; document: any }>({
+    isOpen: false, item: null, document: null
+  });
+
+  // Accordion State
+  const [expandedDocs, setExpandedDocs] = useState<Set<string>>(new Set());
+  
+  const toggleExpand = (docId: string) => {
+    setExpandedDocs(prev => {
+      const next = new Set(prev);
+      if (next.has(docId)) next.delete(docId);
+      else next.add(docId);
+      return next;
+    });
+  };
+
+  const matStats = useMemo(() => {
+    const stats = { all: 0, 'MAT-001': 0, 'MAT-002': 0, 'MAT-003': 0 };
+    data.forEach(d => {
+      if (d.mat_kode !== 'MAT-004') {
+        stats.all++;
+        if (d.mat_kode === 'MAT-001') stats['MAT-001']++;
+        if (d.mat_kode === 'MAT-002') stats['MAT-002']++;
+        if (d.mat_kode === 'MAT-003') stats['MAT-003']++;
+      }
+    });
+    return stats;
+  }, [data]);
 
   const deferredQuery = useDeferredValue(searchQuery);
 
@@ -69,6 +109,14 @@ export function TableTransaksi({ data, mode }: { data: any[], mode: 'berjalan' |
 
   const handleBatchUpdate = (newMat: string) => {
     if (selectedIds.size === 0) return;
+
+    if (newMat === 'MAT-004') {
+      const allSelectedDocs = data.filter(d => selectedIds.has(d.id));
+      const allSelectedItems = allSelectedDocs.flatMap(d => d.items || []);
+      setPenerimaanConfig({ isOpen: true, items: allSelectedItems, actionType: 'batch_doc', targetMat: newMat });
+      return;
+    }
+
     setConfirmConfig({
       isOpen: true,
       title: "Pindah Dokumen (Batch)",
@@ -89,6 +137,14 @@ export function TableTransaksi({ data, mode }: { data: any[], mode: 'berjalan' |
 
   const handleSplitItems = (newMat: string) => {
     if (selectedItemIds.size === 0) return;
+
+    if (newMat === 'MAT-004') {
+      const allItems = data.flatMap(d => d.items || []);
+      const selectedItemsData = allItems.filter(i => selectedItemIds.has(i.id));
+      setPenerimaanConfig({ isOpen: true, items: selectedItemsData, actionType: 'split_items', targetMat: newMat });
+      return;
+    }
+
     setConfirmConfig({
       isOpen: true,
       title: "Pecah Barang (Split)",
@@ -103,6 +159,23 @@ export function TableTransaksi({ data, mode }: { data: any[], mode: 'berjalan' |
             alert("Gagal memecah barang: " + e.message);
           }
         });
+      }
+    });
+  };
+
+  const handlePenerimaanConfirm = (completionData: any[]) => {
+    startTransition(async () => {
+      try {
+        if (penerimaanConfig.actionType === 'batch_doc') {
+          await batchUpdateMat(Array.from(selectedIds), penerimaanConfig.targetMat, completionData);
+          setSelectedIds(new Set());
+        } else {
+          await splitItemsToNewMat(Array.from(selectedItemIds), penerimaanConfig.targetMat, completionData);
+          setSelectedItemIds(new Set());
+        }
+        setPenerimaanConfig({ ...penerimaanConfig, isOpen: false });
+      } catch (e: any) {
+        alert("Gagal menyelesaikan: " + e.message);
       }
     });
   };
@@ -226,6 +299,58 @@ export function TableTransaksi({ data, mode }: { data: any[], mode: 'berjalan' |
         onCancel={() => setConfirmConfig({ ...confirmConfig, isOpen: false })}
       />
 
+      <PenerimaanModal
+        isOpen={penerimaanConfig.isOpen}
+        items={penerimaanConfig.items}
+        onConfirm={handlePenerimaanConfirm}
+        onCancel={() => setPenerimaanConfig({ ...penerimaanConfig, isOpen: false })}
+        isPending={isPending}
+      />
+
+      <ItemDetailModal
+        isOpen={itemDetail.isOpen}
+        onClose={() => setItemDetail({ ...itemDetail, isOpen: false })}
+        item={itemDetail.item}
+        document={itemDetail.document}
+      />
+
+      {/* Quick MAT Tabs & Accordion Controls */}
+      {mode === 'berjalan' && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button 
+            onClick={() => setFilterMat('semua')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${filterMat === 'semua' ? 'bg-ink text-surface shadow-md' : 'bg-surface border border-surface-border text-ink hover:bg-surface-muted'}`}
+          >
+            Semua ({matStats.all})
+          </button>
+          <button 
+            onClick={() => setFilterMat('MAT-001')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${filterMat === 'MAT-001' ? 'bg-[#8a94a6] text-white shadow-md' : 'bg-surface border border-surface-border text-ink hover:bg-surface-muted'}`}
+          >
+            MAT-001 ({matStats['MAT-001']})
+          </button>
+          <button 
+            onClick={() => setFilterMat('MAT-002')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${filterMat === 'MAT-002' ? 'bg-[#e8b031] text-white shadow-md' : 'bg-surface border border-surface-border text-ink hover:bg-surface-muted'}`}
+          >
+            MAT-002 ({matStats['MAT-002']})
+          </button>
+          <button 
+            onClick={() => setFilterMat('MAT-003')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${filterMat === 'MAT-003' ? 'bg-[#228be6] text-white shadow-md' : 'bg-surface border border-surface-border text-ink hover:bg-surface-muted'}`}
+          >
+            MAT-003 ({matStats['MAT-003']})
+          </button>
+          
+          <div className="flex-1"></div>
+          
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setExpandedDocs(new Set(filteredData.map(d => d.id)))} className="h-9 text-xs border-surface-border text-ink">Buka Semua Rincian Barang</Button>
+            <Button variant="outline" size="sm" onClick={() => setExpandedDocs(new Set())} className="h-9 text-xs border-surface-border text-ink">Tutup Semua (Ringkas)</Button>
+          </div>
+        </div>
+      )}
+
       {/* Modern Filter Section */}
       <div className="flex flex-col gap-3 rounded-2xl border border-surface-border/60 bg-surface p-4 shadow-sm transition-all">
         
@@ -329,46 +454,66 @@ export function TableTransaksi({ data, mode }: { data: any[], mode: 'berjalan' |
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <p className="text-sm text-ink-muted">
           Menampilkan <span className="font-medium text-ink">{filteredData.length}</span> transaksi
-          {selectedIds.size > 0 && <span className="ml-2 font-medium text-accent">({selectedIds.size} dokumen dipilih)</span>}
-          {selectedItemIds.size > 0 && <span className="ml-2 font-medium text-warn">({selectedItemIds.size} barang dipilih)</span>}
         </p>
-
-        {/* Batch Actions (Document Level) */}
-        {selectedIds.size > 0 && selectedItemIds.size === 0 && mode === 'berjalan' && (
-          <div className="flex items-center gap-2 animate-in fade-in zoom-in">
-            <span className="text-xs font-medium text-ink-muted">Pindah Dokumen:</span>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => handleBatchUpdate('MAT-002')} disabled={isPending}>
-                <CheckSquare className="mr-2 h-3 w-3" /> Ke MAT-002
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => handleBatchUpdate('MAT-003')} disabled={isPending}>
-                <CheckSquare className="mr-2 h-3 w-3" /> Ke MAT-003
-              </Button>
-              <Button size="sm" className="bg-good hover:bg-good/90 text-white" onClick={() => handleBatchUpdate('MAT-004')} disabled={isPending}>
-                <ListChecks className="mr-2 h-3 w-3" /> Selesai (MAT-004)
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Batch Actions (Item Level - SPLIT) */}
-        {selectedItemIds.size > 0 && mode === 'berjalan' && (
-          <div className="flex items-center gap-2 animate-in fade-in zoom-in rounded-lg bg-warn/10 p-1.5 border border-warn/20">
-            <span className="text-xs font-medium text-warn ml-2">Pecah Barang (Split):</span>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" className="border-warn/30 hover:bg-warn/20 text-warn" onClick={() => handleSplitItems('MAT-002')} disabled={isPending}>
-                <SplitSquareHorizontal className="mr-2 h-3 w-3" /> Ke MAT-002
-              </Button>
-              <Button size="sm" variant="outline" className="border-warn/30 hover:bg-warn/20 text-warn" onClick={() => handleSplitItems('MAT-003')} disabled={isPending}>
-                <SplitSquareHorizontal className="mr-2 h-3 w-3" /> Ke MAT-003
-              </Button>
-              <Button size="sm" className="bg-good hover:bg-good/90 text-white shadow-sm" onClick={() => handleSplitItems('MAT-004')} disabled={isPending}>
-                <ListChecks className="mr-2 h-3 w-3" /> Selesai (MAT-004)
-              </Button>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Floating Action Bar (FAB) for selections */}
+      {(selectedIds.size > 0 || selectedItemIds.size > 0) && mode === 'berjalan' && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] flex animate-in slide-in-from-bottom-4 fade-in duration-300">
+          <div className="bg-surface shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-surface-border/50 rounded-2xl px-5 py-3 flex items-center gap-5">
+            
+            <div className="flex flex-col">
+              <span className={`text-sm font-bold ${selectedItemIds.size > 0 ? 'text-warn' : 'text-accent'}`}>
+                {selectedItemIds.size > 0 ? `${selectedItemIds.size} Barang Dipilih` : `${selectedIds.size} Dokumen Dipilih`}
+              </span>
+              <span className="text-[10px] text-ink-muted uppercase tracking-wider">
+                {selectedItemIds.size > 0 ? 'Mode Pecah Barang' : 'Mode Pindah Dokumen'}
+              </span>
+            </div>
+            
+            <div className="h-8 w-px bg-surface-border/50"></div>
+            
+            {selectedItemIds.size === 0 ? (
+              // Document Level Actions
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => handleBatchUpdate('MAT-002')} disabled={isPending}>
+                  Ke MAT-002
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => handleBatchUpdate('MAT-003')} disabled={isPending}>
+                  Ke MAT-003
+                </Button>
+                <Button size="sm" className="bg-good hover:bg-good/90 text-white shadow-sm" onClick={() => handleBatchUpdate('MAT-004')} disabled={isPending}>
+                  <ListChecks className="mr-2 h-4 w-4" /> Selesai
+                </Button>
+              </div>
+            ) : (
+              // Item Level (Split) Actions
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" className="border-warn/30 text-warn hover:bg-warn/10" onClick={() => handleSplitItems('MAT-002')} disabled={isPending}>
+                  Ke MAT-002
+                </Button>
+                <Button size="sm" variant="outline" className="border-warn/30 text-warn hover:bg-warn/10" onClick={() => handleSplitItems('MAT-003')} disabled={isPending}>
+                  Ke MAT-003
+                </Button>
+                <Button size="sm" className="bg-good hover:bg-good/90 text-white shadow-sm" onClick={() => handleSplitItems('MAT-004')} disabled={isPending}>
+                  <ListChecks className="mr-2 h-4 w-4" /> Selesai
+                </Button>
+              </div>
+            )}
+            
+            <div className="h-8 w-px bg-surface-border/50"></div>
+            
+            <button 
+              onClick={() => { setSelectedIds(new Set()); setSelectedItemIds(new Set()); }} 
+              className="p-1.5 rounded-full hover:bg-surface-muted text-ink-muted transition-colors"
+              title="Batalkan Pilihan"
+            >
+              <FilterX className="h-5 w-5" />
+            </button>
+            
+          </div>
+        </div>
+      )}
 
       <div className="overflow-x-auto rounded-2xl border border-surface-border bg-surface shadow-sm transition-all duration-200 hover:shadow-md relative z-10">
         <table className="w-full text-left text-sm">
@@ -411,7 +556,8 @@ export function TableTransaksi({ data, mode }: { data: any[], mode: 'berjalan' |
               filteredData.flatMap((row) => {
                 const isSelectedDoc = selectedIds.has(row.id);
                 const items = row.items || [];
-                const rowCount = Math.max(1, items.length);
+                const isExpanded = expandedDocs.has(row.id);
+                const rowCount = isExpanded ? Math.max(1, items.length) : 1;
                 
                 let diffDays = 0;
                 let isOverdue = false;
@@ -420,8 +566,15 @@ export function TableTransaksi({ data, mode }: { data: any[], mode: 'berjalan' |
                   diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
                   if (diffDays >= 7) isOverdue = true;
                 }
+                
+                const isDefisit = items.some((item: any) => {
+                  const d = Number(item.jumlah_diajukan) || 0;
+                  const t = Number(item.jumlah_terpenuhi) || 0;
+                  return t < d && d > 0;
+                });
 
-                const docRowClasses = isSelectedDoc ? 'bg-accent/5' : isOverdue ? 'bg-bad/5' : '';
+                // Baris telat akan berwarna merah tipis jika isOverdue
+                const docRowClasses = isSelectedDoc ? 'bg-accent/5' : isOverdue ? 'bg-bad/5 border-l-4 border-l-bad' : '';
 
                 const renderDocColumns = () => (
                   <>
@@ -441,8 +594,19 @@ export function TableTransaksi({ data, mode }: { data: any[], mode: 'berjalan' |
                         <span>{row.nomor_pengajuan}</span>
                         {isOverdue && (
                           <span className="inline-flex animate-pulse items-center gap-1 rounded-full bg-bad/20 px-2 py-0.5 text-[10px] font-bold text-bad uppercase tracking-wider shadow-sm border border-bad/20">
-                            ?? Terlambat ({diffDays} Hari)
+                            ⚠️ Terlambat ({diffDays} Hari)
                           </span>
+                        )}
+                        {mode === 'selesai' && (
+                          isDefisit ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-warn/10 px-2 py-0.5 text-[10px] font-bold text-warn uppercase tracking-wider border border-warn/20" title="Selesai namun ada barang yang tidak terpenuhi penuh">
+                              ⚠️ Parsial
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-good/10 px-2 py-0.5 text-[10px] font-bold text-good uppercase tracking-wider border border-good/20" title="Seluruh barang terpenuhi">
+                              ✅ Tuntas
+                            </span>
+                          )
                         )}
                       </div>
                     </td>
@@ -450,7 +614,14 @@ export function TableTransaksi({ data, mode }: { data: any[], mode: 'berjalan' |
                       <span className="rounded-md bg-surface-muted px-2 py-1 text-xs font-medium">{row.mat_kode}</span>
                     </td>
                     <td className="px-4 py-3 truncate whitespace-normal border-r border-surface-border/50 align-top" title={row.perihal} rowSpan={rowCount}>
-                      {row.perihal}
+                      <div className="flex flex-col gap-2">
+                        <span>{row.perihal}</span>
+                        {isExpanded && items.length > 0 && (
+                          <button onClick={() => toggleExpand(row.id)} className="text-[11px] font-medium text-ink-muted hover:text-ink text-left inline-flex items-center gap-1 mt-1 transition-colors">
+                            ▲ Ringkas Barang
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </>
                 );
@@ -475,6 +646,24 @@ export function TableTransaksi({ data, mode }: { data: any[], mode: 'berjalan' |
                     </div>
                   </td>
                 );
+
+                // Jika dokumen dilipat (Collapsed)
+                if (!isExpanded) {
+                  return [
+                    <tr key={row.id} className={`border-b-2 border-surface-border/80 ${docRowClasses} hover:bg-surface-muted/30 transition-colors`}>
+                      {renderDocColumns()}
+                      <td 
+                        colSpan={mode === 'berjalan' ? 5 : 4} 
+                        className="px-4 py-3 text-center bg-surface-muted/30 cursor-pointer hover:bg-surface-muted/60 transition-colors" 
+                        onClick={() => toggleExpand(row.id)}
+                        title="Klik untuk melihat barang"
+                      >
+                        <span className="text-sm font-semibold text-accent">Lihat {items.length} Barang ▼</span>
+                      </td>
+                      {renderAksiColumn()}
+                    </tr>
+                  ];
+                }
 
                 if (items.length === 0) {
                   return [
@@ -522,7 +711,15 @@ export function TableTransaksi({ data, mode }: { data: any[], mode: 'berjalan' |
                       )}
                       
                       <td className="px-4 py-3 whitespace-normal min-w-[200px]">
-                        <div className="font-medium text-ink">{item.nama_barang}</div>
+                        <div 
+                          className="font-medium text-ink cursor-pointer hover:text-blue-600 hover:underline transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setItemDetail({ isOpen: true, item, document: row });
+                          }}
+                        >
+                          {item.nama_barang}
+                        </div>
                         <div className="flex items-center gap-2 mt-1">
                           {item.ukuran_volume && <span className="text-xs text-ink-muted">({item.ukuran_volume})</span>}
                           <span className="text-[10px] bg-surface-muted/80 border border-surface-border px-1.5 py-0.5 rounded text-ink-muted uppercase font-bold tracking-wider">
