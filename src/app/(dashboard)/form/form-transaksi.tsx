@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2, Plus, Save, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -56,13 +56,21 @@ export function FormTransaksi({ initialData, masterBarang, masterPekerjaan }: { 
     const item = newItems[index];
     item.input_kode = value;
     
-    const matched = masterBarang.find(m => m.kode_barang.toLowerCase() === value.toLowerCase());
+    // Determine which master data to use for this specific item row
+    const itemMasterBarang = item.jenis_pekerjaan 
+      ? masterBarang.filter(m => m.jenis_pekerjaan === 'Umum' || m.jenis_pekerjaan === item.jenis_pekerjaan || !m.jenis_pekerjaan)
+      : masterBarang;
+
+    const matched = itemMasterBarang.find(m => m.kode_barang.toLowerCase() === value.toLowerCase());
     if (matched) {
       item.master_barang_id = matched.id;
       item.kode_barang_manual = null;
       item.nama_barang = matched.nama_barang;
       item.satuan = matched.satuan_default;
       item.jenis_barang = matched.jenis_barang_default;
+      if (matched.jenis_pekerjaan && matched.jenis_pekerjaan !== 'Umum') {
+        item.jenis_pekerjaan = matched.jenis_pekerjaan;
+      }
     } else {
       item.master_barang_id = null;
       item.kode_barang_manual = value || null;
@@ -75,14 +83,22 @@ export function FormTransaksi({ initialData, masterBarang, masterPekerjaan }: { 
     const item = newItems[index];
     item.nama_barang = value;
     
+    // Determine which master data to use for this specific item row
+    const itemMasterBarang = item.jenis_pekerjaan 
+      ? masterBarang.filter(m => m.jenis_pekerjaan === 'Umum' || m.jenis_pekerjaan === item.jenis_pekerjaan || !m.jenis_pekerjaan)
+      : masterBarang;
+    
     // Check if the exact name matches a master item
-    const matched = masterBarang.find(m => m.nama_barang.toLowerCase() === value.toLowerCase());
+    const matched = itemMasterBarang.find(m => m.nama_barang.toLowerCase() === value.toLowerCase());
     if (matched) {
       item.master_barang_id = matched.id;
       item.input_kode = matched.kode_barang;
       item.kode_barang_manual = null;
       item.satuan = matched.satuan_default;
       item.jenis_barang = matched.jenis_barang_default;
+      if (matched.jenis_pekerjaan && matched.jenis_pekerjaan !== 'Umum') {
+        item.jenis_pekerjaan = matched.jenis_pekerjaan;
+      }
     } else {
       item.master_barang_id = null;
       if (!item.kode_barang_manual) {
@@ -129,12 +145,6 @@ export function FormTransaksi({ initialData, masterBarang, masterPekerjaan }: { 
   return (
     <form onSubmit={onSubmit} className="space-y-8">
       {/* DATALISTS FOR AUTOCOMPLETE */}
-      <datalist id="master-kode-list">
-        {masterBarang.map(m => <option key={`kode-${m.id}`} value={m.kode_barang}>{m.nama_barang}</option>)}
-      </datalist>
-      <datalist id="master-nama-list">
-        {masterBarang.map(m => <option key={`nama-${m.id}`} value={m.nama_barang}>{m.kode_barang} - {m.jenis_barang_default}</option>)}
-      </datalist>
       <datalist id="satuan-options-form">
         {SATUAN_UMUM.map(s => <option key={s} value={s} />)}
       </datalist>
@@ -206,8 +216,20 @@ export function FormTransaksi({ initialData, masterBarang, masterPekerjaan }: { 
             statusText = "Penuh";
           }
 
+          // Generate dynamic datalists per item
+          const itemMasterBarang = item.jenis_pekerjaan 
+            ? masterBarang.filter(m => m.jenis_pekerjaan === 'Umum' || m.jenis_pekerjaan === item.jenis_pekerjaan || !m.jenis_pekerjaan)
+            : masterBarang;
+
           return (
             <div key={idx} className={`relative rounded-2xl border ${item.master_barang_id ? 'border-good/40 bg-good/5' : 'border-surface-border/60 bg-surface'} p-5 shadow-sm transition-all duration-300 hover:shadow-md`}>
+              <datalist id={`master-kode-list-${idx}`}>
+                {itemMasterBarang.map(m => <option key={`kode-${m.id}`} value={m.kode_barang}>{m.nama_barang}</option>)}
+              </datalist>
+              <datalist id={`master-nama-list-${idx}`}>
+                {itemMasterBarang.map(m => <option key={`nama-${m.id}`} value={m.nama_barang}>{m.kode_barang} - {m.jenis_barang_default}</option>)}
+              </datalist>
+
               <button 
                 type="button" 
                 onClick={() => removeItem(idx)}
@@ -231,7 +253,7 @@ export function FormTransaksi({ initialData, masterBarang, masterPekerjaan }: { 
                 <div className="space-y-1.5 md:col-span-2">
                   <Label>Kode Barang</Label>
                   <Input 
-                    list="master-kode-list"
+                    list={`master-kode-list-${idx}`}
                     value={item.input_kode} 
                     onChange={(e) => handleKodeChange(idx, e.target.value)}
                     placeholder="Pilih/Ketik..." 
@@ -247,7 +269,7 @@ export function FormTransaksi({ initialData, masterBarang, masterPekerjaan }: { 
                 <div className="space-y-1.5 md:col-span-4">
                   <Label>Nama Barang <span className="text-bad">*</span></Label>
                   <Input 
-                    list="master-nama-list"
+                    list={`master-nama-list-${idx}`}
                     value={item.nama_barang} 
                     onChange={(e) => handleNamaChange(idx, e.target.value)}
                     required 
@@ -367,6 +389,15 @@ export function FormTransaksi({ initialData, masterBarang, masterPekerjaan }: { 
           Simpan Transaksi
         </Button>
       </div>
+
+      {isPending && (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="flex flex-col items-center gap-4 rounded-2xl bg-white p-8 shadow-2xl border border-surface-border">
+            <Loader2 className="h-12 w-12 animate-spin text-accent" />
+            <p className="text-lg font-bold text-ink animate-pulse">Menyimpan Transaksi...</p>
+          </div>
+        </div>
+      )}
     </form>
   );
 }

@@ -516,7 +516,7 @@ export function TableTransaksi({ data, mode }: { data: any[], mode: 'berjalan' |
       )}
 
       <div className="overflow-x-auto rounded-2xl border border-surface-border bg-surface shadow-sm transition-all duration-200 hover:shadow-md relative z-10">
-        <table className="w-full text-left text-sm">
+        <table className="w-full text-left text-sm min-w-[1000px] xl:min-w-full">
           <thead className="border-b border-surface-border bg-surface-muted/50 text-ink-muted">
             <tr>
               {mode === 'berjalan' && (
@@ -538,11 +538,11 @@ export function TableTransaksi({ data, mode }: { data: any[], mode: 'berjalan' |
                   <SplitSquareHorizontal className="h-4 w-4 text-ink-muted" />
                 </th>
               )}
-              <th className="px-4 py-3 font-medium">Barang / Material</th>
-              <th className="px-4 py-3 font-medium">Status Item</th>
-              <th className="px-4 py-3 font-medium">Diajukan</th>
-              <th className="px-4 py-3 font-medium">Terpenuhi</th>
-              <th className="px-4 py-3 font-medium text-right">Aksi Dokumen</th>
+              <th className="px-4 py-3 font-medium whitespace-nowrap">Barang / Material</th>
+              <th className="px-4 py-3 font-medium whitespace-nowrap">Status Item</th>
+              <th className="px-4 py-3 font-medium whitespace-nowrap">Diajukan</th>
+              <th className="px-4 py-3 font-medium whitespace-nowrap">Terpenuhi</th>
+              <th className="px-4 py-3 font-medium text-right whitespace-nowrap">Aksi Dokumen</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-surface-border">
@@ -739,6 +739,16 @@ export function TableTransaksi({ data, mode }: { data: any[], mode: 'berjalan' |
           </tbody>
         </table>
       </div>
+
+      {/* Global Action Loading Overlay */}
+      {isPending && (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="flex flex-col items-center gap-4 rounded-2xl bg-white p-8 shadow-2xl border border-surface-border">
+            <Loader2 className="h-12 w-12 animate-spin text-accent" />
+            <p className="text-lg font-bold text-ink animate-pulse">Sedang Memproses...</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

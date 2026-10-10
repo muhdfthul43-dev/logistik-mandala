@@ -24,6 +24,7 @@
     "date-fns": "^4.4.0",
     "lucide-react": "^1.24.0",
     "next": "16.2.10",
+    "nextjs-toploader": "^3.9.17",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "recharts": "^3.9.2",

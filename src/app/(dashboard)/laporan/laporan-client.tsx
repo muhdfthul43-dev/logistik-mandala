@@ -65,6 +65,13 @@ export function LaporanClient({ masterPekerjaan }: { masterPekerjaan: any[] }) {
 
   return (
     <div>
+      <style dangerouslySetInnerHTML={{__html: `
+        @media print {
+          @page { size: landscape; margin: 10mm; }
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+      `}} />
+
       {/* AREA FILTER - Dihilangkan saat print */}
       <div className="print:hidden space-y-6">
         <div className="rounded-xl border border-surface-border bg-surface p-6 shadow-sm">
@@ -187,13 +194,13 @@ export function LaporanClient({ masterPekerjaan }: { masterPekerjaan: any[] }) {
         <div className="mt-8 overflow-hidden rounded-xl bg-white p-8 text-black shadow-lg print:m-0 print:p-0 print:shadow-none font-serif text-[13px]">
           
           {/* Kop Surat Modern */}
-          <div className="mb-8 flex items-center justify-between border-b-[3px] border-black pb-5">
-            <div className="flex items-center gap-6">
-              <Image src="/logo-sttm.png" alt="Logo STTM" width={100} height={100} className="h-[90px] w-auto grayscale" />
-              <div>
-                <h1 className="text-[22px] font-black uppercase tracking-wider text-black">SEKOLAH TINGGI TEKNOLOGI MANDALA</h1>
-                <p className="text-[15px] font-medium mt-1">Jl. Soekarno Hatta No. 597, Kota Bandung, Jawa Barat</p>
-                <p className="text-[14px]">Email: rektoratmandala@gmail.com | Website: sttmandala.ac.id</p>
+          <div className="mb-6 flex flex-col items-center border-b-4 border-double border-black pb-4 text-center">
+            <div className="flex items-center gap-6 justify-center w-full">
+              <Image src="/logo-sttm.png" alt="Logo STTM" width={100} height={100} className="h-[80px] w-auto" />
+              <div className="text-center">
+                <h1 className="text-[24px] font-black uppercase tracking-widest text-black leading-none mb-1">SEKOLAH TINGGI TEKNOLOGI MANDALA</h1>
+                <p className="text-[14px] font-semibold mt-2">Jl. Soekarno Hatta No. 597, Kota Bandung, Jawa Barat</p>
+                <p className="text-[13px]">Email: rektoratmandala@gmail.com | Website: sttmandala.ac.id</p>
               </div>
             </div>
           </div>
@@ -232,7 +239,7 @@ export function LaporanClient({ masterPekerjaan }: { masterPekerjaan: any[] }) {
                   : (row.jumlah_terpenuhi > 0 ? "bg-yellow-50" : "");
                   
                 return (
-                  <tr key={row.id} className={`${statusColor} hover:bg-gray-50`}>
+                  <tr key={row.id} className={`${statusColor} hover:bg-gray-50 print:break-inside-avoid`}>
                     <td className="border border-gray-400 p-2.5 text-center">{idx + 1}</td>
                     <td className="border border-gray-400 p-2.5">
                       <div className="font-semibold text-xs">{row.pengajuan.nomor_pengajuan}</div>

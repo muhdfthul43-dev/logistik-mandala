@@ -9,6 +9,7 @@ export async function saveMasterBarang(formData: FormData) {
   const nama_barang = formData.get("nama_barang")?.toString();
   const satuan_default = formData.get("satuan_default")?.toString() || "Pcs";
   const jenis_barang_default = formData.get("jenis_barang_default")?.toString() || "habis_pakai";
+  const jenis_pekerjaan = formData.get("jenis_pekerjaan")?.toString() || "Umum";
   
   if (!kode_barang || !nama_barang) throw new Error("Kode dan Nama wajib diisi");
 
@@ -16,12 +17,12 @@ export async function saveMasterBarang(formData: FormData) {
 
   if (id) {
     const { error } = await supabase.from("master_barang").update({
-      kode_barang, nama_barang, satuan_default, jenis_barang_default
+      kode_barang, nama_barang, satuan_default, jenis_barang_default, jenis_pekerjaan
     }).eq("id", id);
     if (error) throw new Error(error.message);
   } else {
     const { error } = await supabase.from("master_barang").insert({
-      kode_barang, nama_barang, satuan_default, jenis_barang_default
+      kode_barang, nama_barang, satuan_default, jenis_barang_default, jenis_pekerjaan
     });
     if (error) throw new Error(error.message);
   }

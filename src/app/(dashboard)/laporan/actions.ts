@@ -28,10 +28,8 @@ export async function getLaporanData(filters: any) {
   }
 
   // Filter Pencarian Text
-  if (filters.search && filters.search.trim() !== "") {
-    const search = `%${filters.search}%`;
-    query = query.or(`nama_barang.ilike.${search},pengajuan.nomor_pengajuan.ilike.${search},pengajuan.perihal.ilike.${search}`);
-  }
+  // Note: Dihapus dari Supabase OR karena PostgREST tidak mendukung OR melintasi tabel relasi (pengajuan.*).
+  // Akan difilter di JS.
 
   // Filter Waktu (Berdasarkan tanggal_pengajuan atau tanggal_penerimaan)
   // Untuk laporan komprehensif, biasanya menggunakan tanggal_pengajuan
@@ -54,8 +52,19 @@ export async function getLaporanData(filters: any) {
     throw new Error(error.message);
   }
 
-  // Filter Status Pemenuhan (dilakukan di JS/Memory karena komparasi kolom butuh RPC di supabase standard)
   let resultData = data || [];
+
+  // JS Memory Filters
+  if (filters.search && filters.search.trim() !== "") {
+    const s = filters.search.toLowerCase();
+    resultData = resultData.filter(item => {
+      const nama = item.nama_barang?.toLowerCase() || "";
+      const no = item.pengajuan?.nomor_pengajuan?.toLowerCase() || "";
+      const perihal = item.pengajuan?.perihal?.toLowerCase() || "";
+      return nama.includes(s) || no.includes(s) || perihal.includes(s);
+    });
+  }
+
   if (filters.status_pemenuhan && filters.status_pemenuhan !== "semua") {
     resultData = resultData.filter(item => {
       const d = Number(item.jumlah_diajukan) || 0;
