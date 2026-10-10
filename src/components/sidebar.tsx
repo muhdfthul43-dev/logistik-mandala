@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -103,7 +103,7 @@ export function Sidebar({ profile }: { profile: Profile }) {
       {/* Desktop Sidebar */}
       <aside 
         className={cn(
-          "hidden lg:flex flex-col h-screen sticky top-0 border-r border-surface-border bg-surface/50 backdrop-blur-xl print:hidden shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-40 transition-all duration-300 ease-in-out relative",
+          "hidden lg:flex flex-col h-screen sticky top-0 border-r border-surface-border bg-surface/50 backdrop-blur-xl print:hidden shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-40 transition-all duration-300 ease-in-out",
           isCollapsed ? "w-[80px]" : "w-[280px]"
         )}
       >
